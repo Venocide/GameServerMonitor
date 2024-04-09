@@ -1,0 +1,188 @@
+name: 🗃 Sync MilitaryRP Server v2.0
+run-name: ${{ github.actor }} is syncing MRP ${{ github.event.inputs.server }} server 🚀
+
+on:
+  workflow_dispatch:
+    inputs:
+      syncType:
+        type: boolean
+        description: Sync New Files Only
+        default: true
+      serverSync:
+        type: choice
+        description: Server to sync to
+        required: true
+        default: 'DEV'
+        options:
+          - LIVE
+          - DEV
+          - NONE
+      moduleDeploy:
+        type: boolean
+        description: Include Modules
+      changeLog:
+        type: boolean
+        description: Include Change Log
+      ftpOptions:
+        type: string
+        description: FTP Options (Debug)
+        required: false
+# JOBS #
+jobs:
+  # SHUTDOWN SERVER JOB #
+  serverShutdown:
+    if: ${{ inputs.serverSync != 'NONE' }}
+    name: 🔴 Stopping Server
+    runs-on: ubuntu-latest
+    steps:
+      # SET SERVER ID #
+      - name: 76544a28
+        run: |
+          if [[ ${{ inputs.serverSync }} == "LIVE" ]]; then
+            echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_LIVE }}" >> $GITHUB_ENV
+          else
+            echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_DEV }}" >> $GITHUB_ENV
+          fi
+        shell: bash
+      # SHUTDOWN SERVER #
+      - name: SHUTDOWN SERVER
+        uses: d3oxy/pterodactyl-power@V1
+        with:
+          PANEL_URL: '${{ secrets.PTERODACTYL_URL }}'
+          API_KEY: ${{ secrets.PTERODACTYL_API_KEY }}
+          SERVER_ID: ${{ env.SERVER_ID }}
+          POWER_ACTION: 'stop'
+      # SHUTDOWN NOTI DISCORD #
+      - name: SHUTDOWN NOTI
+        uses: BubbleProd/discord-webhook-notify@v2.0.1
+        with:
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+          severity: info
+          title: Sync Bot  🤖
+          description: '[**${{ github.actor }}**](https://github.com/${{ github.actor }}) has started sync for **${{ inputs.serverSync }}** server'
+  # SYNC SERVER JOB #
+  serverSync:
+    needs: [serverShutdown]
+    name: 🔀 Syncing Server
+    runs-on: ubuntu-latest
+    steps:
+      # SYNC NOTI DISCORD #
+      - name: SYNC NOTI
+        uses: BubbleProd/discord-webhook-notify@v2.0.1
+        with:
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+          severity: warn
+          title: Sync Bot  🤖
+          description: '**${{ inputs.serverSync }} Server** is syncing!'
+      # CHECKOUT REPO #
+      - name: CHECKOUT REPO
+        uses: actions/checkout@v4
+        with:
+          show-progress: 'true'
+          #fetch-depth: 0
+          submodules: '${{ inputs.moduleDeploy }}'
+      # SET SERVER OPTIONS #
+      - name: SERVER SELECT
+        run: |
+          if [[ ${{ inputs.serverSync }} == "LIVE" ]]; then
+            echo "FTP_USER=${{ secrets.PTERODACTYL_FTP_USER_LIVE }}" >> $GITHUB_ENV
+          else
+            echo "FTP_USER=${{ secrets.PTERODACTYL_FTP_USER_DEV }}" >> $GITHUB_ENV
+          fi
+        shell: bash
+      # SYNC SERVER #
+      - name: SYNC SERVER
+        uses: pressidium/lftp-mirror-action@v1
+        with:
+          host: ${{ secrets.PTERODACTYL_FTP_URL }}
+          port: 2022
+          user: ${{ env.FTP_USER }}
+          pass: ${{ secrets.PTERODACTYL_FTP_PASS }}
+          onlyNewer: '${{ inputs.syncType }}'
+          parallel: '10'
+          localDir: './'
+          remoteDir: './garrysmod/'
+          ignoreFile: '.syncignore'
+          options: '${{ github.event.inputs.ftp_options }}'
+  # UPDATE CHANGELOG JOB #
+  updateChangelog:
+    if: ${{ inputs.changeLog == true }}
+    needs: [serverSync]
+    name: 📑 Updating Changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Changelog Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            CHANGELOG.md
+      - uses: derpierre65/publish-changelog-action@v1
+        with:
+          webhook-url: ${{ secrets.DISCORD_CHANGELOG }}
+          changelog: './CHANGELOG.md'
+          format-version: '[FORTWARS] - ({{date}})'
+  # FINISHED #
+  syncComplete:
+    name: 🥳 Sync Complete
+    if: ${{ success() }}
+    needs: [serverShutdown, serverSync]
+    runs-on: ubuntu-latest
+    steps:
+      # SET SEVER ID #
+      - name: 76544a28
+        run: |
+          if [[ ${{ inputs.serverSync }} == "LIVE" ]]; then
+            echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_LIVE }}" >> $GITHUB_ENV
+          else
+            echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_DEV }}" >> $GITHUB_ENV
+          fi
+        shell: bash
+      # START SERVER #
+      - name: START SERVER
+        uses: d3oxy/pterodactyl-power@V1
+        with:
+          PANEL_URL: '${{ secrets.PTERODACTYL_URL }}'
+          API_KEY: ${{ secrets.PTERODACTYL_API_KEY }}
+          SERVER_ID: ${{ env.SERVER_ID }}
+          POWER_ACTION: 'start'
+      # COMPLETE NOTI DISCORD #
+      - name: COMPLETE NOTI
+        uses: BubbleProd/discord-webhook-notify@v2.0.1
+        with:
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+          severity: info
+          title: Sync Bot  🤖
+          description: "**${{ inputs.serverSync }} Server** has sync'd successfully  🎉"
+          # details: "`135.148.208.129:27019`"
+  # FAILED #
+  failed:
+    name: 🤬 Sync Failed
+    if: failure() || cancelled()
+    needs: [serverShutdown, serverSync, updateChangelog]
+    runs-on: ubuntu-latest
+    steps:
+      # SET SERVER ID #
+      - name: 76544a28
+        run: |
+          if [[ ${{ inputs.serverSync }} == "LIVE" ]]; then
+            echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_LIVE }}" >> $GITHUB_ENV
+          else
+            echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_DEV }}" >> $GITHUB_ENV
+          fi
+        shell: bash
+      # START SERVER #
+      - name: START SERVER
+        uses: d3oxy/pterodactyl-power@V1
+        with:
+          PANEL_URL: '${{ secrets.PTERODACTYL_URL }}'
+          API_KEY: ${{ secrets.PTERODACTYL_API_KEY }}
+          SERVER_ID: ${{ env.SERVER_ID }}
+          POWER_ACTION: 'start'
+      # FAILED NOTI DISCORD #
+      - name: FAILED NOTI
+        uses: BubbleProd/discord-webhook-notify@v2.0.1
+        with:
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+          severity: error
+          title: Sync Bot  🤖
+          description: '**${{ inputs.serverSync }} Server** sync has **failed** or been **canceled**  🤬'
