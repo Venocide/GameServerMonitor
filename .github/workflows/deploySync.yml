@@ -1,5 +1,5 @@
-name: 🗃 Sync MilitaryRP Server v2.0
-run-name: ${{ github.actor }} is syncing MRP ${{ github.event.inputs.server }} server 🚀
+name: 🗃 Sync Pterodactyl Panel
+run-name: ${{ github.actor }} is syncing DiscordGSM ${{ github.event.inputs.server }} server 🚀
 
 on:
   workflow_dispatch:
@@ -12,10 +12,9 @@ on:
         type: choice
         description: Server to sync to
         required: true
-        default: 'DEV'
+        default: 'LIVE'
         options:
           - LIVE
-          - DEV
           - NONE
       moduleDeploy:
         type: boolean
@@ -36,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # SET SERVER ID #
-      - name: 76544a28
+      - name: 7ccbfed9
         run: |
           if [[ ${{ inputs.serverSync }} == "LIVE" ]]; then
             echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_LIVE }}" >> $GITHUB_ENV
@@ -101,7 +100,7 @@ jobs:
           onlyNewer: '${{ inputs.syncType }}'
           parallel: '10'
           localDir: './'
-          remoteDir: './garrysmod/'
+          remoteDir: './'
           ignoreFile: '.syncignore'
           options: '${{ github.event.inputs.ftp_options }}'
   # UPDATE CHANGELOG JOB #
@@ -129,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # SET SEVER ID #
-      - name: 76544a28
+      - name: 7ccbfed9
         run: |
           if [[ ${{ inputs.serverSync }} == "LIVE" ]]; then
             echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_LIVE }}" >> $GITHUB_ENV
@@ -162,7 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # SET SERVER ID #
-      - name: 76544a28
+      - name: 7ccbfed9
         run: |
           if [[ ${{ inputs.serverSync }} == "LIVE" ]]; then
             echo "SERVER_ID=${{ secrets.PTERODACTYL_ID_LIVE }}" >> $GITHUB_ENV
